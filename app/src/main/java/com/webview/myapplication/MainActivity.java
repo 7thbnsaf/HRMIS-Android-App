@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.DownloadManager;
 import android.content.Context;
+import android.content.Intent;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
@@ -31,14 +32,29 @@ public class MainActivity extends Activity {
 
         mWebView = findViewById(R.id.activity_main_webview);
         WebSettings webSettings = mWebView.getSettings();
+        
+        // 1. Enable Storage & JS for Embedded Google Apps Script
         webSettings.setJavaScriptEnabled(true);
+        webSettings.setDomStorageEnabled(true);
+        webSettings.setDatabaseEnabled(true);
+
+        // 2. Modify User-Agent (Removes WebView flag to bypass Google Login restrictions)
+        String userAgent = webSettings.getUserAgentString();
+        String customUserAgent = userAgent.replace("; wv", "");
+        webSettings.setUserAgentString(customUserAgent);
+
+        // 3. Enable Cookies and Third-Party Cookies for iframe support
+        CookieManager cookieManager = CookieManager.getInstance();
+        cookieManager.setAcceptCookie(true);
+        cookieManager.setAcceptThirdPartyCookies(mWebView, true);
+
         mWebView.setWebViewClient(new HelloWebViewClient());
 
-        mWebView.setDownloadListener((url, userAgent, contentDisposition, mimetype, contentLength) -> {
+        mWebView.setDownloadListener((url, downloadUserAgent, contentDisposition, mimetype, contentLength) -> {
             DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
             request.setMimeType(mimetype);
             request.addRequestHeader("cookie", CookieManager.getInstance().getCookie(url));
-            request.addRequestHeader("User-Agent", userAgent);
+            request.addRequestHeader("User-Agent", downloadUserAgent);
             request.setDescription("Downloading file...");
             request.setTitle(URLUtil.guessFileName(url, contentDisposition, mimetype));
             request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
@@ -58,7 +74,7 @@ public class MainActivity extends Activity {
             @Override
             public void onAvailable(Network network) {
                 runOnUiThread(() -> {
-                    if (!mWebView.getUrl().startsWith("file:///android_asset")) {
+                    if (mWebView.getUrl() != null && mWebView.getUrl().startsWith("file:///android_asset")) {
                         mWebView.loadUrl("https://7thbnsaf.github.io/HRMIS/Index.html");
                     }
                 });
@@ -84,11 +100,19 @@ public class MainActivity extends Activity {
         return actNw != null && (actNw.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || actNw.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) || actNw.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) || actNw.hasTransport(NetworkCapabilities.TRANSPORT_VPN));
     }
 
-    private static class HelloWebViewClient extends WebViewClient {
+    private class HelloWebViewClient extends WebViewClient {
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-            view.loadUrl(request.getUrl().toString());
-            return true;
+            String url = request.getUrl().toString();
+
+            // Intercept Google Accounts / Auth URLs and open them safely in Chrome/Device Browser
+            if (url.contains("accounts.google.com") || url.contains("accounts.youtube.com")) {
+                Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                startActivity(intent);
+                return true;
+            }
+
+            return false;
         }
     }
 
