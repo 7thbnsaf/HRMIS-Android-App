@@ -12,16 +12,23 @@ import android.net.ConnectivityManager.NetworkCallback;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.print.PrintAttributes;
+import android.print.PrintDocumentAdapter;
+import android.print.PrintManager;
+import android.view.View;
 import android.webkit.CookieManager;
 import android.webkit.URLUtil;
+import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.RelativeLayout;
 import android.widget.Toast;
 
 public class MainActivity extends Activity {
     private WebView mWebView;
+    private RelativeLayout splashLayout;
     private NetworkCallback networkCallback;
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -31,50 +38,67 @@ public class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
 
         mWebView = findViewById(R.id.activity_main_webview);
+        splashLayout = findViewById(R.id.splash_layout);
+
         WebSettings webSettings = mWebView.getSettings();
         
-        // 1. Enable Storage & JS for Embedded Google Apps Script
+        // 1. Enable Storage, JS & Window features
         webSettings.setJavaScriptEnabled(true);
         webSettings.setDomStorageEnabled(true);
         webSettings.setDatabaseEnabled(true);
         webSettings.setSupportMultipleWindows(true);
         webSettings.setJavaScriptCanOpenWindowsAutomatically(true);
 
-        // 2. Modify User-Agent (Removes WebView flag to bypass Google Login restrictions)
+        // 2. User-Agent modification for Google Auth
         String userAgent = webSettings.getUserAgentString();
-        String customUserAgent = userAgent.replace("; wv", "");
-        webSettings.setUserAgentString(customUserAgent);
+        webSettings.setUserAgentString(userAgent.replace("; wv", ""));
 
-        // 3. Enable Cookies and Third-Party Cookies for iframe support
+        // 3. Cookies Setup
         CookieManager cookieManager = CookieManager.getInstance();
         cookieManager.setAcceptCookie(true);
         cookieManager.setAcceptThirdPartyCookies(mWebView, true);
 
+        // 4. WebChromeClient (Hides splash screen on page finish + Print Support)
+        mWebView.setWebChromeClient(new WebChromeClient());
+
         mWebView.setWebViewClient(new HelloWebViewClient());
 
-        // 4. Download Listener for Files
+        // 5. Enhanced Download Listener
         mWebView.setDownloadListener((url, downloadUserAgent, contentDisposition, mimetype, contentLength) -> {
-            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
-            request.setMimeType(mimetype);
-            request.addRequestHeader("cookie", CookieManager.getInstance().getCookie(url));
-            request.addRequestHeader("User-Agent", downloadUserAgent);
-            request.setDescription("Downloading file...");
-            request.setTitle(URLUtil.guessFileName(url, contentDisposition, mimetype));
-            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, URLUtil.guessFileName(url, contentDisposition, mimetype));
-            DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
-            dm.enqueue(request);
-            Toast.makeText(getApplicationContext(), "Downloading File", Toast.LENGTH_LONG).show();
+            try {
+                DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
+                request.setMimeType(mimetype);
+                
+                String cookies = CookieManager.getInstance().getCookie(url);
+                if (cookies != null) {
+                    request.addRequestHeader("cookie", cookies);
+                }
+                request.addRequestHeader("User-Agent", downloadUserAgent);
+                request.setDescription("Downloading file...");
+                
+                String fileName = URLUtil.guessFileName(url, contentDisposition, mimetype);
+                request.setTitle(fileName);
+                request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
+                
+                DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+                if (dm != null) {
+                    dm.enqueue(request);
+                    Toast.makeText(getApplicationContext(), "Downloading: " + fileName, Toast.LENGTH_LONG).show();
+                }
+            } catch (Exception e) {
+                Toast.makeText(getApplicationContext(), "Download failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            }
         });
 
-        // 5. Initial Network Check
+        // 6. Network check & initial load
         if (isNetworkAvailable()) {
             mWebView.loadUrl("https://7thbnsaf.github.io/HRMIS/Index.html");
         } else {
             mWebView.loadUrl("file:///android_asset/offline.html");
         }
 
-        // 6. Real-time Network Monitoring
+        // 7. Network Callback
         networkCallback = new NetworkCallback() {
             @Override
             public void onAvailable(Network network) {
@@ -94,40 +118,59 @@ public class MainActivity extends Activity {
             }
         };
         ConnectivityManager connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-        connectivityManager.registerDefaultNetworkCallback(networkCallback);
+        if (connectivityManager != null) {
+            connectivityManager.registerDefaultNetworkCallback(networkCallback);
+        }
+    }
+
+    // Method to trigger printing from Android / JavaScript window.print()
+    public void printWebPage() {
+        PrintManager printManager = (PrintManager) getSystemService(Context.PRINT_SERVICE);
+        if (printManager != null) {
+            PrintDocumentAdapter printAdapter = mWebView.createPrintDocumentAdapter("HRMIS_Document");
+            String jobName = getString(R.string.app_name) + " Document";
+            printManager.print(jobName, printAdapter, new PrintAttributes.Builder().build());
+        }
     }
 
     private boolean isNetworkAvailable() {
         ConnectivityManager connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (connectivityManager == null) return false;
         Network nw = connectivityManager.getActiveNetwork();
         if (nw == null) return false;
         NetworkCapabilities actNw = connectivityManager.getNetworkCapabilities(nw);
-        return actNw != null && (actNw.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || actNw.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) || actNw.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) || actNw.hasTransport(NetworkCapabilities.TRANSPORT_VPN));
+        return actNw != null && (actNw.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || 
+               actNw.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) || 
+               actNw.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) || 
+               actNw.hasTransport(NetworkCapabilities.TRANSPORT_VPN));
     }
 
     private class HelloWebViewClient extends WebViewClient {
         @Override
+        public void onPageFinished(WebView view, String url) {
+            super.onPageFinished(view, url);
+            // Hide splash screen once page finishes loading
+            if (splashLayout != null && splashLayout.getVisibility() == View.VISIBLE) {
+                splashLayout.setVisibility(View.GONE);
+            }
+        }
+
+        @Override
         public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
             String url = request.getUrl().toString();
 
-            // Intercept Google Login/OAuth URLs -> Redirect to System Browser
-            if (url.contains("accounts.google.com") || 
-                url.contains("ServiceLogin") || 
-                url.contains("oauth2/v2/auth")) {
-                
+            // Intercept Google Logins -> System Browser
+            if (url.contains("accounts.google.com") || url.contains("ServiceLogin") || url.contains("oauth2/v2/auth")) {
                 Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
                 startActivity(intent);
                 return true;
             }
 
-            // Keep inner app pages and Google Apps Script inside WebView
-            if (url.contains("7thbnsaf.github.io") || 
-                url.contains("script.google.com") || 
-                url.startsWith("file:///")) {
+            // Keep App URLs inside WebView
+            if (url.contains("7thbnsaf.github.io") || url.contains("script.google.com") || url.startsWith("file:///")) {
                 return false;
             }
 
-            // Open all other external links in default browser
             Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
             startActivity(intent);
             return true;
@@ -148,7 +191,9 @@ public class MainActivity extends Activity {
         super.onDestroy();
         if (networkCallback != null) {
             ConnectivityManager connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-            connectivityManager.unregisterNetworkCallback(networkCallback);
+            if (connectivityManager != null) {
+                connectivityManager.unregisterNetworkCallback(networkCallback);
+            }
         }
     }
 }
