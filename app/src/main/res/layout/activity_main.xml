@@ -1,12 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
+    <!-- Main WebView Container -->
     <WebView
         android:id="@+id/activity_main_webview"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
+
+    <!-- Splash Screen Overlay -->
+    <RelativeLayout
+        android:id="@+id/splash_layout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#FFFFFF"
+        android:clickable="true"
+        android:focusable="true">
+
+        <ImageView
+            android:id="@+id/splash_logo"
+            android:layout_width="180dp"
+            android:layout_height="180dp"
+            android:layout_centerInParent="true"
+            android:src="@drawable/logo"
+            android:contentDescription="App Logo" />
+
+        <ProgressBar
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/splash_logo"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="24dp" />
+    </RelativeLayout>
 
 </RelativeLayout>
