@@ -23,13 +23,15 @@ jobs:
       uses: gradle/actions/setup-gradle@v4
 
     - name: Make Gradle Wrapper Executable
+      working-directory: ./HRMIS-Android-App
       run: chmod +x gradlew
 
     - name: Build Debug APK
-      run: ./gradlew :HRMIS-Android-App:assembleDebug --no-daemon
+      working-directory: ./HRMIS-Android-App
+      run: ./gradlew assembleDebug --no-daemon
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: HRMIS-Debug-APK
-        path: "**/build/outputs/apk/**/*.apk"
+        path: "HRMIS-Android-App/**/build/outputs/apk/**/*.apk"
