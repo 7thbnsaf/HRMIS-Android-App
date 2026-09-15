@@ -9,6 +9,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: write
+
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
@@ -30,6 +33,13 @@ jobs:
 
     - name: Overwrite Existing APK in app/release
       run: cp -f app/build/outputs/apk/debug/app-debug.apk app/release/app-debug.apk
+
+    - name: Commit and Push Updated APK
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git add app/release/app-debug.apk
+        git diff --quiet && git diff --staged --quiet || (git commit -m "auto: update compiled release apk [skip ci]" && git push)
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
