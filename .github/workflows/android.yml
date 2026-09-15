@@ -25,11 +25,11 @@ jobs:
     - name: Make Gradle Wrapper Executable
       run: chmod +x gradlew
 
-    - name: Build APK
-      run: ./gradlew build --no-daemon
+    - name: Build Debug APK
+      run: ./gradlew :HRMIS-Android-App:assembleDebug --no-daemon
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: hrmis-app
+        name: HRMIS-Debug-APK
         path: "**/build/outputs/apk/**/*.apk"
