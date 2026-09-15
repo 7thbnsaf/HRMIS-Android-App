@@ -37,6 +37,8 @@ public class MainActivity extends Activity {
         webSettings.setJavaScriptEnabled(true);
         webSettings.setDomStorageEnabled(true);
         webSettings.setDatabaseEnabled(true);
+        webSettings.setSupportMultipleWindows(true);
+        webSettings.setJavaScriptCanOpenWindowsAutomatically(true);
 
         // 2. Modify User-Agent (Removes WebView flag to bypass Google Login restrictions)
         String userAgent = webSettings.getUserAgentString();
@@ -50,6 +52,7 @@ public class MainActivity extends Activity {
 
         mWebView.setWebViewClient(new HelloWebViewClient());
 
+        // 4. Download Listener for Files
         mWebView.setDownloadListener((url, downloadUserAgent, contentDisposition, mimetype, contentLength) -> {
             DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
             request.setMimeType(mimetype);
@@ -64,12 +67,14 @@ public class MainActivity extends Activity {
             Toast.makeText(getApplicationContext(), "Downloading File", Toast.LENGTH_LONG).show();
         });
 
+        // 5. Initial Network Check
         if (isNetworkAvailable()) {
             mWebView.loadUrl("https://7thbnsaf.github.io/HRMIS/Index.html");
         } else {
             mWebView.loadUrl("file:///android_asset/offline.html");
         }
 
+        // 6. Real-time Network Monitoring
         networkCallback = new NetworkCallback() {
             @Override
             public void onAvailable(Network network) {
@@ -105,14 +110,27 @@ public class MainActivity extends Activity {
         public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
             String url = request.getUrl().toString();
 
-            // Intercept Google Accounts / Auth URLs and open them safely in Chrome/Device Browser
-            if (url.contains("accounts.google.com") || url.contains("accounts.youtube.com")) {
+            // Intercept Google Login/OAuth URLs -> Redirect to System Browser
+            if (url.contains("accounts.google.com") || 
+                url.contains("ServiceLogin") || 
+                url.contains("oauth2/v2/auth")) {
+                
                 Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
                 startActivity(intent);
                 return true;
             }
 
-            return false;
+            // Keep inner app pages and Google Apps Script inside WebView
+            if (url.contains("7thbnsaf.github.io") || 
+                url.contains("script.google.com") || 
+                url.startsWith("file:///")) {
+                return false;
+            }
+
+            // Open all other external links in default browser
+            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+            startActivity(intent);
+            return true;
         }
     }
 
