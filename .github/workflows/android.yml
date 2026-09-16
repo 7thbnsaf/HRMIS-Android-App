@@ -1,48 +1,48 @@
 name: Build Android APK
 
 on:
-  push:
-    branches: [ "master", "main" ]
-  workflow_dispatch:
+push:
+branches: [ "master", "main" ]
+workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+build:
+runs-on: ubuntu-latest
 
-    permissions:
-      contents: write
+permissions:
+  contents: write
 
-    steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
+steps:
+- name: Checkout Code
+  uses: actions/checkout@v4
 
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
-      with:
-        java-version: '17'
-        distribution: 'temurin'
+- name: Set up JDK 17
+  uses: actions/setup-java@v4
+  with:
+    java-version: '17'
+    distribution: 'temurin'
 
-    - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v3
+- name: Setup Gradle
+  uses: gradle/actions/setup-gradle@v3
 
-    - name: Make Gradle Wrapper Executable
-      run: chmod +x gradlew
+- name: Make Gradle Wrapper Executable
+  run: chmod +x gradlew
 
-    - name: Build Debug APK
-      run: ./gradlew :app:assembleDebug --no-daemon
+- name: Build Debug APK
+  run: ./gradlew :app:assembleDebug --no-daemon
 
-    - name: Overwrite Existing APK in app/release
-      run: cp -f app/build/outputs/apk/debug/app-debug.apk app/release/app-debug.apk
+- name: Overwrite Existing APK in app/release
+  run: cp -f app/build/outputs/apk/debug/app-debug.apk app/release/HRMIS.apk
 
-    - name: Commit and Push Updated APK
-      run: |
-        git config --global user.name "github-actions[bot]"
-        git config --global user.email "github-actions[bot]@users.noreply.github.com"
-        git add app/release/app-debug.apk
-        git diff --quiet && git diff --staged --quiet || (git commit -m "auto: update compiled release apk [skip ci]" && git push)
+- name: Commit and Push Updated APK
+  run: |
+    git config --global user.name "github-actions[bot]"
+    git config --global user.email "github-actions[bot]@users.noreply.github.com"
+    git add app/release/HRMIS.apk
+    git diff --quiet && git diff --staged --quiet || (git commit -m "auto: update compiled release apk [skip ci]" && git push)
 
-    - name: Upload APK Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: HRMIS-Debug-APK
-        path: app/release/HRMIS.apk
+- name: Upload APK Artifact
+  uses: actions/upload-artifact@v4
+  with:
+    name: HRMIS-Debug-APK
+    path: app/release/HRMIS.apk
